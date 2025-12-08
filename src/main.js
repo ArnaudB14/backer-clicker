@@ -1,12 +1,16 @@
 import Phaser from "phaser";
 import { gameConfig } from "./game/config";
-import BootScene from "./game/scenes/BootScene";
-import GameScene from "./game/scenes/GameScene";
+import "./style.css";
 
-const config = {
-  ...gameConfig,
-  parent: "app",
-  scene: [BootScene, GameScene],
-};
+const game = new Phaser.Game(gameConfig);
 
-new Phaser.Game(config);
+function resize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const scale = Math.min(w / 360, h / 640);
+
+  const canvas = game.canvas;
+}
+
+window.addEventListener("resize", resize);
+resize();

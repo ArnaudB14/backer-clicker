@@ -1,14 +1,25 @@
+import BootScene from "./scenes/BootScene";
+import GameScene from "./scenes/GameScene";
+
 export const gameConfig = {
   type: Phaser.AUTO,
+  parent: "game",
   width: 360,
   height: 640,
-  backgroundColor: "#0b0f1a",
+
+  resolution: Math.max(1, window.devicePixelRatio || 1),
+
   scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
+    mode: Phaser.Scale.NONE,          // pas de resize automatique
+    autoCenter: Phaser.Scale.NO_CENTER // IMPORTANT
   },
-  fps: {
-    target: 60,
-    forceSetTimeOut: true,
+
+  render: {
+    antialias: true,
+    pixelArt: false,
+    roundPixels: true,
   },
+
+  scene: [BootScene, GameScene],
 };
+
