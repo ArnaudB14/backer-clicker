@@ -17,28 +17,42 @@ export default class GameScene extends Phaser.Scene {
     this.state = this.registry.get("state");
     this.offline = this.registry.get("offline");
 
+    // ---- MIGRATION SAVE : aligner state.bakers sur BAKERS
+if (!this.state.bakers || !Array.isArray(this.state.bakers)) {
+  this.state.bakers = [];
+}
+
+for (let i = 0; i < BAKERS.length; i++) {
+  if (!this.state.bakers[i]) {
+    this.state.bakers[i] = { level: 0 };
+  }
+}
+
+
+    const { width, height } = this.scale;
     const UI_DEPTH = 10;
 
-    // ----- BACKGROUND (pastel cozy gradient + blobs)
-    const bg = this.add.graphics();
-    bg.fillGradientStyle(0xF6F8FF, 0xF6F8FF, 0xEAF3FF, 0xEAF3FF, 1);
-    bg.fillRect(0, 0, 360, 640);
+    // ----- BACKGROUND (PNG storybook)
+    this.bg = this.add
+      .image(width / 2, height / 2, "bg1")
+      .setOrigin(0.5)
+      .setDepth(-100);
 
-    this.add.circle(40, 70, 90, 0xFFD7E6, 0.22);
-    this.add.circle(330, 170, 120, 0xD7FFE9, 0.18);
-    this.add.circle(300, 520, 140, 0xFFF0C9, 0.2);
+    const bgScaleX = width / this.bg.width;
+    const bgScaleY = height / this.bg.height;
+    const bgScale = Math.max(bgScaleX, bgScaleY);
+    this.bg.setScale(bgScale);
+    this.bg.setScrollFactor(0);
 
-    // Panels (cards) - in background depths
-    this.headerPanel = this.panel(12, 10, 336, 96);
-    this.monsterPanel = this.panel(12, 118, 336, 250);
-    this.upgradePanel = this.panel(12, 382, 336, 246);
+    // Panels (header only)
+    this.headerPanel = this.panel(12, 10, 336, 52);
 
     // ----- HEADER UI
-    this.add
+    this.sugarIcon = this.add
       .image(30, 34, "sugarIcon")
-      .setScale(0.55)
       .setOrigin(0.5)
       .setDepth(UI_DEPTH);
+    this.scaleToWidth(this.sugarIcon, 22);
 
     this.sugarText = this.add
       .text(54, 18, "", {
@@ -50,7 +64,7 @@ export default class GameScene extends Phaser.Scene {
       .setDepth(UI_DEPTH);
 
     this.zoneText = this.add
-      .text(54, 54, "", {
+      .text(54, 40, "", {
         fontFamily: "Baloo 2, system-ui",
         fontSize: "14px",
         color: "#6B7A95",
@@ -59,7 +73,7 @@ export default class GameScene extends Phaser.Scene {
       .setDepth(UI_DEPTH);
 
     this.dpsText = this.add
-      .text(210, 54, "", {
+      .text(210, 40, "", {
         fontFamily: "Baloo 2, system-ui",
         fontSize: "14px",
         color: "#6B7A95",
@@ -69,14 +83,16 @@ export default class GameScene extends Phaser.Scene {
 
     // ----- MONSTER
     this.monsterShadow = this.add
-      .ellipse(180, 310, 150, 28, 0x000000, 0.12)
+      .ellipse(width / 2, 310, 150, 28, 0x000000, 0.12)
       .setDepth(UI_DEPTH);
 
     this.monsterImage = this.add
-      .image(180, 230, this.monsterKey())
-      .setScale(0.78)
+      .image(width / 2, 230, this.monsterKey())
       .setInteractive({ useHandCursor: true })
       .setDepth(UI_DEPTH);
+
+    this.scaleToWidth(this.monsterImage, width * 0.50);
+    this.monsterBaseScale = this.monsterImage.scaleX;
 
     this.monsterImage.on("pointerdown", () => this.tapMonster());
 
@@ -84,24 +100,35 @@ export default class GameScene extends Phaser.Scene {
     this.hpBarBg = this.roundRect(60, 318, 240, 18, 9, 0xE0E7F5);
     this.hpBarBg.setDepth(UI_DEPTH);
 
-    this.hpBarFill = this.roundRect(60, 318, 240, 18, 9, 0xFF7AAE);
+    this.hpBarFill = this.roundRect(60, 318, 240, 18, 9, 0xFFB454);
     this.hpBarFill.setDepth(UI_DEPTH);
 
     this.hpText = this.add
-      .text(180, 317, "", {
+      .text(width / 2, 327, "", {
         fontFamily: "Baloo 2, system-ui",
-        fontSize: "12px",
+        fontSize: "14px",
         color: "#1F2A44",
         fontStyle: "600",
       })
       .setOrigin(0.5)
       .setDepth(UI_DEPTH);
 
-    // ----- UPGRADE CARDS (3 bakers)
-    this.cards = BAKERS.map((cfg, i) => this.createBakerCard(cfg, i, UI_DEPTH));
+    // ----- SCROLLABLE BAKERS LIST
+    this.listX = 12;
+    this.listY = 382;
+    this.listW = 336;
+    this.listH = height - this.listY - 12; // prend tout le bas dispo
+
+    this.cardGap = 8;
+    this.cardH = 76;        // slot height (68 + marge)
+    this.cardInnerH = 68;
+
+    this.createScrollableBakerList(UI_DEPTH);
 
     // Offline popup
-    if (this.offline?.gained > 0) this.showOfflinePopup(this.offline, UI_DEPTH);
+    if (this.offline?.gained > 0) {
+      this.showOfflinePopup(this.offline, UI_DEPTH);
+    }
 
     // Tick
     this.lastTick = performance.now();
@@ -121,7 +148,6 @@ export default class GameScene extends Phaser.Scene {
     const dt = (now - this.lastTick) / 1000;
     this.lastTick = now;
 
-    // Auto DPS
     const dps = computeTotalDps(this.state);
     if (dps > 0) this.damageMonster(dps * dt);
 
@@ -136,7 +162,6 @@ export default class GameScene extends Phaser.Scene {
     const r = this.add.rectangle(x, y, w, h, 0xFFFFFF).setOrigin(0);
     r.setStrokeStyle(2, 0xE0E7F5, 1);
 
-    // Panels in background
     shadow.setDepth(1);
     r.setDepth(2);
 
@@ -150,25 +175,110 @@ export default class GameScene extends Phaser.Scene {
     return g;
   }
 
+  scaleToWidth(sprite, targetWidth) {
+    const s = targetWidth / sprite.width;
+    sprite.setScale(s);
+    return sprite;
+  }
+
+  // ---------- Scrollable list ----------
+  createScrollableBakerList(UI_DEPTH) {
+    // container scrollable
+    this.bakerList = this.add.container(0, 0).setDepth(UI_DEPTH);
+
+    this.cards = [];
+
+    BAKERS.forEach((cfg, i) => {
+      const localY = this.cardGap + i * this.cardH;
+      const cardObj = this.createBakerCard(cfg, i, localY);
+      this.bakerList.add(cardObj.root);
+      this.cards.push(cardObj);
+    });
+
+    this.listContentH = this.cardGap + BAKERS.length * this.cardH;
+    this.scrollY = 0;
+
+    // mask viewport
+    const maskGfx = this.make.graphics();
+    maskGfx.fillStyle(0xffffff);
+    maskGfx.fillRect(this.listX, this.listY, this.listW, this.listH);
+    const mask = maskGfx.createGeometryMask();
+    this.bakerList.setMask(mask);
+
+    // position initiale
+    this.bakerList.x = this.listX;
+    this.bakerList.y = this.listY;
+
+    // wheel scroll desktop
+    this.input.on("wheel", (_p, _g, _dx, dy) => {
+      this.setScroll(this.scrollY - dy * 0.5);
+    });
+
+    // drag scroll tactile/souris
+    this.enableListDrag();
+  }
+
+  enableListDrag() {
+    const hitZone = new Phaser.Geom.Rectangle(
+      this.listX,
+      this.listY,
+      this.listW,
+      this.listH
+    );
+
+    const zone = this.add
+      .zone(this.listX, this.listY, this.listW, this.listH)
+      .setOrigin(0)
+      .setInteractive(hitZone, Phaser.Geom.Rectangle.Contains);
+
+    let dragging = false;
+    let lastY = 0;
+
+    zone.on("pointerdown", (p) => {
+      dragging = true;
+      lastY = p.y;
+    });
+
+    zone.on("pointermove", (p) => {
+      if (!dragging) return;
+      const delta = p.y - lastY;
+      lastY = p.y;
+      this.setScroll(this.scrollY + delta);
+    });
+
+    zone.on("pointerup", () => (dragging = false));
+    zone.on("pointerout", () => (dragging = false));
+  }
+
+  setScroll(y) {
+    const minScroll = Math.min(0, this.listH - this.listContentH);
+    const maxScroll = 0;
+
+    this.scrollY = Phaser.Math.Clamp(y, minScroll, maxScroll);
+    this.bakerList.y = this.listY + this.scrollY;
+  }
+
   // ---------- Monster logic ----------
   monsterKey() {
     const isBoss = this.state.zone % 10 === 0;
     if (isBoss) {
       return Math.floor(this.state.zone / 10) % 2 === 0 ? "mb1" : "mb2";
     }
-    const idx = (this.state.zone - 1) % 8;
+    const idx = (this.state.zone - 1) % 9;
     return ["m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9"][idx];
   }
 
   tapMonster() {
     this.damageMonster(this.state.tapDamage);
-    this.spawnCrumbs(180, 230);
+    this.spawnCrumbs(this.monsterImage.x, this.monsterImage.y);
 
-    // squash feedback
-    this.monsterImage.setScale(0.74);
+    const base = this.monsterBaseScale;
+    this.monsterImage.setScale(base * 0.94);
+
     this.tweens.add({
       targets: this.monsterImage,
-      scale: 0.78,
+      scaleX: base,
+      scaleY: base,
       duration: 90,
       ease: "quad.out",
     });
@@ -185,78 +295,74 @@ export default class GameScene extends Phaser.Scene {
     const m = computeMonsterForZone(this.state.zone);
     this.state.sugar += m.reward;
 
-    // next zone
     this.state.zone += 1;
     const next = computeMonsterForZone(this.state.zone);
     this.state.monsterHpMax = next.hpMax;
     this.state.monsterHp = next.hpMax;
 
-    // change sprite
     this.monsterImage.setTexture(this.monsterKey());
+    const targetMonsterWidth = this.scale.width * 0.50;
+    this.monsterImage.setScale(targetMonsterWidth / this.monsterImage.width);
+    this.monsterBaseScale = this.monsterImage.scaleX;
 
-    // celebration
-    this.spawnCrumbs(180, 230, 12);
+    this.spawnCrumbs(this.monsterImage.x, this.monsterImage.y, 12);
   }
 
   // ---------- Bakers cards ----------
-  createBakerCard(cfg, index, UI_DEPTH) {
-    const cardY = 400 + index * 76;
+  createBakerCard(cfg, index, localY) {
+    const cardX = 10; // relatif au container
+    const cardY = localY;
+
+    const root = this.add.container(0, 0);
 
     const shadow = this.add
-      .rectangle(22 + 2, cardY + 3, 316, 68, 0x000000, 0.06)
-      .setOrigin(0)
-      .setDepth(UI_DEPTH);
+      .rectangle(cardX + 2, cardY + 3, 316, 68, 0x000000, 0.06)
+      .setOrigin(0);
 
     const card = this.add
-      .rectangle(22, cardY, 316, 68, 0xFFFFFF)
+      .rectangle(cardX, cardY, 316, 68, 0xFFFFFF)
       .setOrigin(0)
       .setStrokeStyle(2, 0xE0E7F5, 1)
-      .setDepth(UI_DEPTH);
+      .setAlpha(0.8);
 
     const icon = this.add
-      .image(52, cardY + 34, cfg.icon)
-      .setScale(0.60)
-      .setDepth(UI_DEPTH);
+      .image(cardX + 30, cardY + 34, cfg.icon)
+      .setOrigin(0.5);
+    this.scaleToWidth(icon, 56);
 
     const name = this.add
-      .text(82, cardY + 6, cfg.name, {
+      .text(cardX + 60, cardY + 18, cfg.name, {
         fontFamily: "Baloo 2, system-ui",
         fontSize: "15px",
         color: "#1F2A44",
         fontStyle: "700",
-      })
-      .setDepth(UI_DEPTH);
+      });
 
     const info = this.add
-      .text(82, cardY + 30, "", {
+      .text(cardX + 60, cardY + 36, "", {
         fontFamily: "Baloo 2, system-ui",
         fontSize: "12px",
         color: "#6B7A95",
         fontStyle: "600",
-      })
-      .setDepth(UI_DEPTH);
+      });
 
     const buyShadow = this.add
-      .rectangle(250 + 2, cardY + 14, 76, 44, 0x000000, 0.12)
-      .setOrigin(0)
-      .setDepth(UI_DEPTH);
+      .rectangle(cardX + 227, cardY + 14, 76, 44, 0x000000, 0.12)
+      .setOrigin(0);
 
     const buyBtn = this.add
-      .rectangle(250, cardY + 12, 76, 44, 0x4AA3FF)
+      .rectangle(cardX + 226, cardY + 12, 76, 44, 0x026d5a)
       .setOrigin(0)
-      .setStrokeStyle(2, 0x2E86E8)
-      .setInteractive({ useHandCursor: true })
-      .setDepth(UI_DEPTH);
+      .setInteractive({ useHandCursor: true });
 
     const buyText = this.add
-      .text(288, cardY + 22, "BUY", {
+      .text(cardX + 265, cardY + 35, "BUY", {
         fontFamily: "Baloo 2, system-ui",
         fontSize: "13px",
         color: "#FFFFFF",
         fontStyle: "700",
       })
-      .setOrigin(0.5)
-      .setDepth(UI_DEPTH);
+      .setOrigin(0.5);
 
     buyBtn.on("pointerdown", () => {
       this.buyBaker(index);
@@ -272,7 +378,10 @@ export default class GameScene extends Phaser.Scene {
       buyShadow.scale = 1;
     });
 
+    root.add([shadow, card, icon, name, info, buyShadow, buyBtn, buyText]);
+
     return {
+      root,
       cfg,
       index,
       card,
@@ -295,7 +404,11 @@ export default class GameScene extends Phaser.Scene {
 
     this.state.sugar -= cost;
     this.state.bakers[i].level += 1;
+
+    
+    // position des crumbs sur le bouton de la card (approx)
     this.spawnCrumbs(288, 400 + i * 76 + 34, 6);
+
     this.refreshAll();
   }
 
@@ -338,13 +451,18 @@ export default class GameScene extends Phaser.Scene {
       1
     );
 
-    // HP fill width update via graphics: clear & redraw
+    // HP fill: éviter glitch quand ratio ~0
+    const hpX = 60, hpY = 318, hpW = 240, hpH = 18, r = 9;
+    const w = hpW * ratio;
+
     this.hpBarFill.clear();
-    this.hpBarFill.fillStyle(
-      computeMonsterForZone(this.state.zone).isBoss ? 0xFFB454 : 0xFF7AAE,
-      1
-    );
-    this.hpBarFill.fillRoundedRect(60, 318, 240 * ratio, 18, 9);
+    if (w > 0.5) {
+      this.hpBarFill.fillStyle(
+        computeMonsterForZone(this.state.zone).isBoss ? 0xe0584e : 0xFFB454,
+        1
+      );
+      this.hpBarFill.fillRoundedRect(hpX, hpY, w, hpH, r);
+    }
 
     this.hpText.setText(
       `${fmt(this.state.monsterHp)} / ${fmt(this.state.monsterHpMax)}`
@@ -359,9 +477,13 @@ export default class GameScene extends Phaser.Scene {
       c.info.setText(`Lvl ${lvl} • DPS ${fmt(dpsOne)} • Cost ${fmt(cost)}`);
 
       const affordable = this.state.sugar >= cost;
-      c.buyBtn.fillColor = affordable ? 0x4AA3FF : 0x9BB3C9;
+      c.buyBtn.fillColor = affordable ? 0x026d5a : 0x9BB3C9;
       c.buyText.setText(affordable ? "BUY" : "LOCK");
     });
+
+    // Si tu ajoutes beaucoup de bakers en runtime, recalculer content height
+    this.listContentH = this.cardGap + BAKERS.length * this.cardH;
+    this.setScroll(this.scrollY);
   }
 
   refreshThrottled() {
@@ -373,12 +495,18 @@ export default class GameScene extends Phaser.Scene {
 
   // ---------- Offline popup ----------
   showOfflinePopup({ elapsedSec, gained }, UI_DEPTH) {
-    const w = 300, h = 160;
+    const w = 300, h = 140;
     const x = (360 - w) / 2;
     const y = 160;
 
-    const shadow = this.add.rectangle(x + 2, y + 4, w, h, 0x000000, 0.1).setOrigin(0).setDepth(UI_DEPTH + 5);
-    const panel = this.add.rectangle(x, y, w, h, 0xffffff, 1).setOrigin(0).setDepth(UI_DEPTH + 5);
+    const shadow = this.add.rectangle(x + 2, y + 4, w, h, 0x000000, 0.1)
+      .setOrigin(0)
+      .setDepth(UI_DEPTH + 5);
+
+    const panel = this.add.rectangle(x, y, w, h, 0xffffff, 1)
+      .setOrigin(0)
+      .setDepth(UI_DEPTH + 5);
+
     panel.setStrokeStyle(2, 0xe0e7f5, 1);
 
     const txt = this.add.text(
@@ -394,14 +522,17 @@ export default class GameScene extends Phaser.Scene {
       }
     ).setDepth(UI_DEPTH + 6);
 
-    const btnShadow = this.add.rectangle(x + 16, y + 102, w - 28, 46, 0x000000, 0.12).setOrigin(0).setDepth(UI_DEPTH + 5);
-    const btn = this.add.rectangle(x + 14, y + 100, w - 28, 46, 0x58d68d)
+    const btnShadow = this.add.rectangle(x + 16, y + 82, w - 28, 46, 0x000000, 0.12)
       .setOrigin(0)
-      .setStrokeStyle(2, 0x3bbf74)
+      .setDepth(UI_DEPTH + 5);
+
+    const btn = this.add.rectangle(x + 14, y + 81, w - 28, 46, 0x026d5a)
+      .setOrigin(0)
+      .setStrokeStyle(2, 0x026d5a)
       .setInteractive({ useHandCursor: true })
       .setDepth(UI_DEPTH + 6);
 
-    const btntxt = this.add.text(x + w / 2, y + 112, "COLLECT", {
+    const btntxt = this.add.text(x + w / 2, y + 105, "COLLECT", {
       fontFamily: "Baloo 2, system-ui",
       fontSize: "14px",
       color: "#FFFFFF",
