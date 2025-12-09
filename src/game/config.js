@@ -6,6 +6,13 @@ export const gameConfig = {
   parent: "game",
   backgroundColor: "transparent",
 
+  input: {
+    activePointers: 3,
+    touch: {
+      capture: true   // <-- crucial sur mobile
+    }
+  },
+
   // Plus de pixels internes = texte plus net même si FIT scale
   resolution: Math.min(3, window.devicePixelRatio || 1),
 

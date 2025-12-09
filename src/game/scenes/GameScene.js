@@ -17,6 +17,20 @@ export default class GameScene extends Phaser.Scene {
   }
 
   create() {
+    const canvas = this.game.canvas;
+
+// iOS/Safari: empêche le navigateur d'intercepter les swipes
+canvas.addEventListener(
+  "touchmove",
+  (e) => e.preventDefault(),
+  { passive: false }
+);
+canvas.addEventListener(
+  "touchstart",
+  (e) => e.preventDefault(),
+  { passive: false }
+);
+
     this.state = this.registry.get("state");
     this.offline = this.registry.get("offline");
 this.cameras.main.roundPixels = true;
@@ -220,7 +234,6 @@ this.cameras.main.roundPixels = true;
   }
 
 enableListDrag() {
-  // zone logique du scroll (rect de la liste)
   this.listRect = new Phaser.Geom.Rectangle(
     this.listX,
     this.listY,
@@ -232,7 +245,6 @@ enableListDrag() {
   let lastY = 0;
   let moved = 0;
 
-  // IMPORTANT : permet de recevoir les events même si un enfant est interactif
   this.input.setTopOnly(false);
 
   this.input.on("pointerdown", (p) => {
@@ -244,21 +256,18 @@ enableListDrag() {
 
   this.input.on("pointermove", (p) => {
     if (!dragging || !p.isDown) return;
-
     const delta = p.y - lastY;
     lastY = p.y;
     moved += Math.abs(delta);
-
     this.setScroll(this.scrollY + delta);
   });
 
-  const stopDrag = () => {
+  this.input.on("pointerup", (p) => {
     dragging = false;
-    moved = 0;
-  };
 
-  this.input.on("pointerup", stopDrag);
-  this.input.on("pointerout", stopDrag);
+    // si le doigt a bougé => on annule le click sur les boutons
+    if (moved > 8) p.event?.stopPropagation?.();
+  });
 }
 
 
