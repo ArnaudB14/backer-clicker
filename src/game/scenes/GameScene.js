@@ -489,21 +489,29 @@ enableListDrag() {
       1
     );
 
-    const hpX = 60,
-      hpY = 318,
-      hpW = 240,
-      hpH = 18,
-      r = 9;
-    const w = hpW * ratio;
+const hpX = 60, hpY = 318, hpW = 240, hpH = 18, r = 9;
+const w = hpW * ratio;
 
-    this.hpBarFill.clear();
-    if (w > 0.5) {
-      this.hpBarFill.fillStyle(
-        computeMonsterForZone(this.state.zone).isBoss ? 0xe0584e : 0xffb454,
-        1
-      );
-      this.hpBarFill.fillRoundedRect(hpX, hpY, w, hpH, r);
-    }
+this.hpBarFill.clear();
+
+if (w <= 0.5) {
+  // rien à dessiner
+} else if (w < r * 2) {
+  // trop petit pour un rounded rect => rectangle normal
+  this.hpBarFill.fillStyle(
+    computeMonsterForZone(this.state.zone).isBoss ? 0xe0584e : 0xFFB454,
+    1
+  );
+  this.hpBarFill.fillRect(hpX, hpY, w, hpH);
+} else {
+  // largeur suffisante => rounded rect normal
+  this.hpBarFill.fillStyle(
+    computeMonsterForZone(this.state.zone).isBoss ? 0xe0584e : 0xFFB454,
+    1
+  );
+  this.hpBarFill.fillRoundedRect(hpX, hpY, w, hpH, r);
+}
+
 
     const hpShown = Math.ceil(this.state.monsterHp);
     const hpMaxShown = Math.ceil(this.state.monsterHpMax);
