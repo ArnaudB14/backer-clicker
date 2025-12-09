@@ -219,37 +219,48 @@ this.cameras.main.roundPixels = true;
     this.enableListDrag();
   }
 
-  enableListDrag() {
-    const hitZone = new Phaser.Geom.Rectangle(
-      this.listX,
-      this.listY,
-      this.listW,
-      this.listH
-    );
+enableListDrag() {
+  // zone logique du scroll (rect de la liste)
+  this.listRect = new Phaser.Geom.Rectangle(
+    this.listX,
+    this.listY,
+    this.listW,
+    this.listH
+  );
 
-    const zone = this.add
-      .zone(this.listX, this.listY, this.listW, this.listH)
-      .setOrigin(0)
-      .setInteractive(hitZone, Phaser.Geom.Rectangle.Contains);
+  let dragging = false;
+  let lastY = 0;
+  let moved = 0;
 
-    let dragging = false;
-    let lastY = 0;
+  // IMPORTANT : permet de recevoir les events même si un enfant est interactif
+  this.input.setTopOnly(false);
 
-    zone.on("pointerdown", (p) => {
-      dragging = true;
-      lastY = p.y;
-    });
+  this.input.on("pointerdown", (p) => {
+    if (!this.listRect.contains(p.x, p.y)) return;
+    dragging = true;
+    lastY = p.y;
+    moved = 0;
+  });
 
-    zone.on("pointermove", (p) => {
-      if (!dragging) return;
-      const delta = p.y - lastY;
-      lastY = p.y;
-      this.setScroll(this.scrollY + delta);
-    });
+  this.input.on("pointermove", (p) => {
+    if (!dragging || !p.isDown) return;
 
-    zone.on("pointerup", () => (dragging = false));
-    zone.on("pointerout", () => (dragging = false));
-  }
+    const delta = p.y - lastY;
+    lastY = p.y;
+    moved += Math.abs(delta);
+
+    this.setScroll(this.scrollY + delta);
+  });
+
+  const stopDrag = () => {
+    dragging = false;
+    moved = 0;
+  };
+
+  this.input.on("pointerup", stopDrag);
+  this.input.on("pointerout", stopDrag);
+}
+
 
   setScroll(y) {
     const minScroll = Math.min(0, this.listH - this.listContentH);

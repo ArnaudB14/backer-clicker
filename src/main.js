@@ -4,13 +4,10 @@ import "./style.css";
 
 const game = new Phaser.Game(gameConfig);
 
-function resize() {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  const scale = Math.min(w / 360, h / 640);
+const refresh = () => {
+  game.scale.refresh();
+};
 
-  const canvas = game.canvas;
-}
-
-window.addEventListener("resize", resize);
-resize();
+window.addEventListener("resize", refresh);
+window.addEventListener("orientationchange", refresh);
+refresh();
