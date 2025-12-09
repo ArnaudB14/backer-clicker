@@ -21,8 +21,17 @@ html, body {
 }
 
 #app, #game, #game canvas {
-  width: 100% !important;
-  height: 100% !important;
+  width: 100%;
+  height: 100%;
   touch-action: none;
-  margin-top: 0 !important;
+  margin-top: 0;
+}
+
+@media (max-width: 480px) {
+  #app, #game, #game canvas {
+    width: 100% !important;
+    height: 100% !important;
+    touch-action: none;
+    margin-top: 0 !important;
+  }
 }
