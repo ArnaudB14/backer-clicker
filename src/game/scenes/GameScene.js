@@ -19,6 +19,7 @@ export default class GameScene extends Phaser.Scene {
   create() {
     this.state = this.registry.get("state");
     this.offline = this.registry.get("offline");
+this.cameras.main.roundPixels = true;
 
     // ---- MIGRATION SAVE : aligner state.bakers sur BAKERS
     if (!this.state.bakers || !Array.isArray(this.state.bakers)) {

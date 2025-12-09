@@ -44,3 +44,19 @@ body {
 #game canvas {
   display: block;
 }
+
+html, body, #app, #game {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  overflow: hidden;
+  background: #0000; /* ou ta couleur */
+}
+
+#game canvas {
+  display: block;
+}

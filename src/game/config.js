@@ -4,22 +4,20 @@ import GameScene from "./scenes/GameScene";
 export const gameConfig = {
   type: Phaser.AUTO,
   parent: "game",
-  width: 360,
-  height: 640,
-
-  resolution: Math.max(1, window.devicePixelRatio || 1),
-
-  scale: {
-    mode: Phaser.Scale.NONE,          // pas de resize automatique
-    autoCenter: Phaser.Scale.NO_CENTER // IMPORTANT
-  },
+  backgroundColor: "transparent",
+  resolution: window.devicePixelRatio || 1,   // <-- clé du net
 
   render: {
     antialias: true,
-    pixelArt: false,
-    roundPixels: true,
+    roundPixels: true,                        // <-- aide le texte
+  },
+
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: 360,
+    height: 640,
   },
 
   scene: [BootScene, GameScene],
 };
-
