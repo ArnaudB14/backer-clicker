@@ -6,7 +6,6 @@ export default class BootScene extends Phaser.Scene {
   }
 
   preload() {
-    // Monsters chibi (load.image pour SVG)
     this.load.image("m1", "assets/monsters/monster1.png");
     this.load.image("m2", "assets/monsters/monster2.png");
     this.load.image("m3", "assets/monsters/monster3.png");
@@ -19,7 +18,6 @@ export default class BootScene extends Phaser.Scene {
     this.load.image("mb1", "assets/monsters/monster_boss1.png");
     this.load.image("mb2", "assets/monsters/monster_boss2.png");
 
-    // Bakers
     this.load.image("baker1", "assets/bakers/baker1.png");
     this.load.image("baker2", "assets/bakers/baker2.png");
     this.load.image("baker3", "assets/bakers/baker3.png");
@@ -30,8 +28,6 @@ export default class BootScene extends Phaser.Scene {
     this.load.image("baker8", "assets/bakers/baker8.png");
     this.load.image("tap", "assets/bakers/tap.png");
 
-
-    // UI
     this.load.image("sugarIcon", "assets/ui/icon_sugar.svg");
     this.load.image("crumb", "assets/ui/crumb.svg");
 

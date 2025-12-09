@@ -19,7 +19,6 @@ export default class GameScene extends Phaser.Scene {
   create() {
     const canvas = this.game.canvas;
 
-// iOS/Safari: empêche le navigateur d'intercepter les swipes
 canvas.addEventListener(
   "touchmove",
   (e) => e.preventDefault(),
@@ -35,7 +34,6 @@ canvas.addEventListener(
     this.offline = this.registry.get("offline");
 this.cameras.main.roundPixels = true;
 
-    // ---- MIGRATION SAVE : aligner state.bakers sur BAKERS
     if (!this.state.bakers || !Array.isArray(this.state.bakers)) {
       this.state.bakers = [];
     }
@@ -48,7 +46,7 @@ this.cameras.main.roundPixels = true;
     const { width, height } = this.scale;
     const UI_DEPTH = 10;
 
-    // ----- BACKGROUND (PNG storybook)
+    // ----- BACKGROUND
     this.bg = this.add
       .image(width / 2, height / 2, "bg1")
       .setOrigin(0.5)
@@ -265,7 +263,6 @@ enableListDrag() {
   this.input.on("pointerup", (p) => {
     dragging = false;
 
-    // si le doigt a bougé => on annule le click sur les boutons
     if (moved > 8) p.event?.stopPropagation?.();
   });
 }
@@ -495,16 +492,13 @@ const w = hpW * ratio;
 this.hpBarFill.clear();
 
 if (w <= 0.5) {
-  // rien à dessiner
 } else if (w < r * 2) {
-  // trop petit pour un rounded rect => rectangle normal
   this.hpBarFill.fillStyle(
     computeMonsterForZone(this.state.zone).isBoss ? 0xe0584e : 0xFFB454,
     1
   );
   this.hpBarFill.fillRect(hpX, hpY, w, hpH);
 } else {
-  // largeur suffisante => rounded rect normal
   this.hpBarFill.fillStyle(
     computeMonsterForZone(this.state.zone).isBoss ? 0xe0584e : 0xFFB454,
     1
@@ -527,8 +521,8 @@ if (w <= 0.5) {
         const tapOne = bakerTap(c.cfg, lvl || 1);
 c.info.setText(`Lvl ${lvl} • Tap +${fmt(tapOne)} • Cost ${fmt(cost)}`);
       } else {
-        const dpsOne = bakerDps(c.cfg, lvl) || 0; // DPS du prochain achat
-        const dpsTotal = bakerTotalDps(c.cfg, lvl) || 0; // DPS total de ce tier
+        const dpsOne = bakerDps(c.cfg, lvl) || 0;
+        const dpsTotal = bakerTotalDps(c.cfg, lvl) || 0;
 
         const dpsOneShown =
           dpsOne < 1

@@ -1,3 +1,5 @@
+import { BAKERS } from "./systems/world"; // ajuste le chemin
+
 export const defaultState = () => ({
   sugar: 0,
 
@@ -7,12 +9,12 @@ export const defaultState = () => ({
   monsterHpMax: 0,
 
   tapDamage: 1,
+  baseTapDamage: 1, // optionnel mais utile pour computeTapDamage
 
-  bakers: [
-    { id: "apprentice", level: 0 }, // baker 1
-    { id: "golem", level: 0 },      // baker 2
-    { id: "witch", level: 0 },      // baker 3
-  ],
+  bakers: BAKERS.map(b => ({
+    id: b.id,
+    level: 0,
+  })),
 
   lastSave: Date.now(),
 });

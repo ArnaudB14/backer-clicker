@@ -9,11 +9,10 @@ export const gameConfig = {
   input: {
     activePointers: 3,
     touch: {
-      capture: true   // <-- crucial sur mobile
+      capture: true
     }
   },
 
-  // Plus de pixels internes = texte plus net même si FIT scale
   resolution: Math.min(3, window.devicePixelRatio || 1),
 
   render: {
@@ -26,7 +25,7 @@ export const gameConfig = {
     autoCenter: Phaser.Scale.CENTER_BOTH,
     width: 360,
     height: 640,
-    autoRound: true,   // évite les tailles CSS fractionnaires
+    autoRound: true,
   },
 
   scene: [BootScene, GameScene],
