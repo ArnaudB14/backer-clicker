@@ -63,10 +63,10 @@ this.cameras.main.roundPixels = true;
 
     // ----- HEADER UI
     this.sugarIcon = this.add
-      .image(30, 34, "sugarIcon")
+      .image(34, 34, "sugarIcon")
       .setOrigin(0.5)
       .setDepth(UI_DEPTH);
-    this.scaleToWidth(this.sugarIcon, 22);
+    this.scaleToWidth(this.sugarIcon, 32);
 
     this.sugarText = this.add
       .text(54, 18, "", {
