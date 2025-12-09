@@ -15,6 +15,16 @@ export function computeMonsterForZone(zone) {
 
 // Bakers config
 export const BAKERS = [
+    {
+      id: "tapmaster",
+      name: "Tap Master",
+      baseCost: 10,
+      baseDps: 0,
+      tapBase: 1,
+      tapGrowth: 1.10,
+      costGrowth: 1.17,
+      icon: "tap",
+    },
   {
     id: "baby",
     name: "Baby Baker",
@@ -93,15 +103,68 @@ export function bakerCost(bakerCfg, level) {
   return bakerCfg.baseCost * Math.pow(bakerCfg.costGrowth, level);
 }
 
-export function bakerDps(bakerCfg, level) {
+export function bakerDps(cfg, lvl) {
+  const level = Math.max(0, lvl ?? 0);
+  const base = cfg.baseDps ?? 0;
+  const growth = cfg.dpsGrowth ?? 1;
   if (level <= 0) return 0;
-  // dps = base * level * growth^level (très clicker heroes-like)
-  return bakerCfg.baseDps * level * Math.pow(bakerCfg.dpsGrowth, level);
+  return base * Math.pow(growth, level - 1);
 }
 
+export function bakerTotalDps(cfg, lvl) {
+  const level = Math.max(0, lvl ?? 0);
+  if (level <= 0) return 0;
+
+  // si pas de croissance, c'est juste base * lvl
+  const base = cfg.baseDps ?? 0;
+  const g = cfg.dpsGrowth ?? 1;
+
+  if (g === 1) return base * level;
+
+  // somme géométrique : base * (g^level - 1)/(g - 1)
+  return base * (Math.pow(g, level) - 1) / (g - 1);
+}
+
+
 export function computeTotalDps(state) {
-  return BAKERS.reduce((sum, cfg, i) => {
-    const lvl = state.bakers[i]?.level || 0;
-    return sum + bakerDps(cfg, lvl);
-  }, 0);
+  let total = 0;
+
+  for (let i = 0; i < BAKERS.length; i++) {
+    const cfg = BAKERS[i];
+    const lvl = state.bakers?.[i]?.level ?? 0;
+
+    if (cfg.tapBase) continue; // ignore le baker TAP
+
+    total += bakerTotalDps(cfg, lvl);
+  }
+
+  return total;
+}
+
+
+
+export function bakerTap(cfg, level) {
+  if (!cfg.tapBase) return 0;
+  // bonus par niveau = tapBase * tapGrowth^(level-1)
+  return cfg.tapBase * Math.pow(cfg.tapGrowth ?? 1.0, Math.max(0, level - 1));
+}
+
+export function computeTapDamage(state) {
+  // dégâts de base au clic (tu peux le garder dans state si tu veux)
+  const baseTap = state.baseTapDamage ?? 1;
+
+  let bonusTap = 0;
+  for (let i = 0; i < BAKERS.length; i++) {
+    const cfg = BAKERS[i];
+    const lvl = state.bakers?.[i]?.level ?? 0;
+    if (lvl > 0 && cfg.tapBase) {
+      // somme des bonus de tap de ce baker
+      // (on additionne tap par niveau)
+      for (let l = 1; l <= lvl; l++) {
+        bonusTap += bakerTap(cfg, l);
+      }
+    }
+  }
+
+  return baseTap + bonusTap;
 }

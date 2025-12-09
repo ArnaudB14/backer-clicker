@@ -28,6 +28,8 @@ export default class BootScene extends Phaser.Scene {
     this.load.image("baker6", "assets/bakers/baker6.png");
     this.load.image("baker7", "assets/bakers/baker7.png");
     this.load.image("baker8", "assets/bakers/baker8.png");
+    this.load.image("tap", "assets/bakers/tap.png");
+
 
     // UI
     this.load.image("sugarIcon", "assets/ui/icon_sugar.svg");

@@ -2,9 +2,12 @@ import { fmt } from "../systems/format";
 import {
   computeMonsterForZone,
   computeTotalDps,
+  computeTapDamage,
   BAKERS,
   bakerCost,
   bakerDps,
+  bakerTotalDps,
+  bakerTap,
 } from "../systems/world";
 import { save } from "../systems/save";
 
@@ -18,16 +21,14 @@ export default class GameScene extends Phaser.Scene {
     this.offline = this.registry.get("offline");
 
     // ---- MIGRATION SAVE : aligner state.bakers sur BAKERS
-if (!this.state.bakers || !Array.isArray(this.state.bakers)) {
-  this.state.bakers = [];
-}
-
-for (let i = 0; i < BAKERS.length; i++) {
-  if (!this.state.bakers[i]) {
-    this.state.bakers[i] = { level: 0 };
-  }
-}
-
+    if (!this.state.bakers || !Array.isArray(this.state.bakers)) {
+      this.state.bakers = [];
+    }
+    for (let i = 0; i < BAKERS.length; i++) {
+      if (!this.state.bakers[i]) {
+        this.state.bakers[i] = { level: 0 };
+      }
+    }
 
     const { width, height } = this.scale;
     const UI_DEPTH = 10;
@@ -91,9 +92,8 @@ for (let i = 0; i < BAKERS.length; i++) {
       .setInteractive({ useHandCursor: true })
       .setDepth(UI_DEPTH);
 
-    this.scaleToWidth(this.monsterImage, width * 0.50);
+    this.scaleToWidth(this.monsterImage, width * 0.5);
     this.monsterBaseScale = this.monsterImage.scaleX;
-
     this.monsterImage.on("pointerdown", () => this.tapMonster());
 
     // ----- HP BAR (capsule)
@@ -117,10 +117,10 @@ for (let i = 0; i < BAKERS.length; i++) {
     this.listX = 12;
     this.listY = 382;
     this.listW = 336;
-    this.listH = height - this.listY - 12; // prend tout le bas dispo
+    this.listH = height - this.listY - 12;
 
     this.cardGap = 8;
-    this.cardH = 76;        // slot height (68 + marge)
+    this.cardH = 76;
     this.cardInnerH = 68;
 
     this.createScrollableBakerList(UI_DEPTH);
@@ -148,7 +148,7 @@ for (let i = 0; i < BAKERS.length; i++) {
     const dt = (now - this.lastTick) / 1000;
     this.lastTick = now;
 
-    const dps = computeTotalDps(this.state);
+    const dps = computeTotalDps(this.state) || 0;
     if (dps > 0) this.damageMonster(dps * dt);
 
     this.refreshThrottled();
@@ -159,8 +159,8 @@ for (let i = 0; i < BAKERS.length; i++) {
     const shadow = this.add
       .rectangle(x + 2, y + 4, w, h, 0x000000, 0.08)
       .setOrigin(0);
-    const r = this.add.rectangle(x, y, w, h, 0xFFFFFF).setOrigin(0);
-    r.setStrokeStyle(2, 0xE0E7F5, 1);
+    const r = this.add.rectangle(x, y, w, h, 0xffffff).setOrigin(0);
+    r.setStrokeStyle(2, 0xe0e7f5, 1);
 
     shadow.setDepth(1);
     r.setDepth(2);
@@ -181,11 +181,15 @@ for (let i = 0; i < BAKERS.length; i++) {
     return sprite;
   }
 
+  scaleToFit(sprite, maxW, maxH) {
+    const s = Math.min(maxW / sprite.width, maxH / sprite.height);
+    sprite.setScale(s);
+    return sprite;
+  }
+
   // ---------- Scrollable list ----------
   createScrollableBakerList(UI_DEPTH) {
-    // container scrollable
     this.bakerList = this.add.container(0, 0).setDepth(UI_DEPTH);
-
     this.cards = [];
 
     BAKERS.forEach((cfg, i) => {
@@ -198,23 +202,19 @@ for (let i = 0; i < BAKERS.length; i++) {
     this.listContentH = this.cardGap + BAKERS.length * this.cardH;
     this.scrollY = 0;
 
-    // mask viewport
     const maskGfx = this.make.graphics();
     maskGfx.fillStyle(0xffffff);
     maskGfx.fillRect(this.listX, this.listY, this.listW, this.listH);
     const mask = maskGfx.createGeometryMask();
     this.bakerList.setMask(mask);
 
-    // position initiale
     this.bakerList.x = this.listX;
     this.bakerList.y = this.listY;
 
-    // wheel scroll desktop
     this.input.on("wheel", (_p, _g, _dx, dy) => {
       this.setScroll(this.scrollY - dy * 0.5);
     });
 
-    // drag scroll tactile/souris
     this.enableListDrag();
   }
 
@@ -285,8 +285,18 @@ for (let i = 0; i < BAKERS.length; i++) {
   }
 
   damageMonster(amount) {
+    if (!Number.isFinite(amount) || amount <= 0) return;
+
     this.state.monsterHp -= amount;
-    if (this.state.monsterHp <= 0) {
+
+    if (!Number.isFinite(this.state.monsterHp) || this.state.monsterHp < 0) {
+      this.state.monsterHp = 0;
+    }
+
+    const eps = Math.max(1e-3, this.state.monsterHpMax * 0.001);
+
+    if (this.state.monsterHp <= eps) {
+      this.state.monsterHp = 0;
       this.killMonster();
     }
   }
@@ -301,7 +311,7 @@ for (let i = 0; i < BAKERS.length; i++) {
     this.state.monsterHp = next.hpMax;
 
     this.monsterImage.setTexture(this.monsterKey());
-    const targetMonsterWidth = this.scale.width * 0.50;
+    const targetMonsterWidth = this.scale.width * 0.5;
     this.monsterImage.setScale(targetMonsterWidth / this.monsterImage.width);
     this.monsterBaseScale = this.monsterImage.scaleX;
 
@@ -310,7 +320,7 @@ for (let i = 0; i < BAKERS.length; i++) {
 
   // ---------- Bakers cards ----------
   createBakerCard(cfg, index, localY) {
-    const cardX = 10; // relatif au container
+    const cardX = 10;
     const cardY = localY;
 
     const root = this.add.container(0, 0);
@@ -320,31 +330,29 @@ for (let i = 0; i < BAKERS.length; i++) {
       .setOrigin(0);
 
     const card = this.add
-      .rectangle(cardX, cardY, 316, 68, 0xFFFFFF)
+      .rectangle(cardX, cardY, 316, 68, 0xffffff)
       .setOrigin(0)
-      .setStrokeStyle(2, 0xE0E7F5, 1)
+      .setStrokeStyle(2, 0xe0e7f5, 1)
       .setAlpha(0.8);
 
     const icon = this.add
       .image(cardX + 30, cardY + 34, cfg.icon)
       .setOrigin(0.5);
-    this.scaleToWidth(icon, 56);
+    this.scaleToFit(icon, 56, 56);
 
-    const name = this.add
-      .text(cardX + 60, cardY + 18, cfg.name, {
-        fontFamily: "Baloo 2, system-ui",
-        fontSize: "15px",
-        color: "#1F2A44",
-        fontStyle: "700",
-      });
+    const name = this.add.text(cardX + 60, cardY + 18, cfg.name, {
+      fontFamily: "Baloo 2, system-ui",
+      fontSize: "15px",
+      color: "#1F2A44",
+      fontStyle: "700",
+    });
 
-    const info = this.add
-      .text(cardX + 60, cardY + 36, "", {
-        fontFamily: "Baloo 2, system-ui",
-        fontSize: "12px",
-        color: "#6B7A95",
-        fontStyle: "600",
-      });
+    const info = this.add.text(cardX + 60, cardY + 36, "", {
+      fontFamily: "Baloo 2, system-ui",
+      fontSize: "12px",
+      color: "#6B7A95",
+      fontStyle: "600",
+    });
 
     const buyShadow = this.add
       .rectangle(cardX + 227, cardY + 14, 76, 44, 0x000000, 0.12)
@@ -397,7 +405,9 @@ for (let i = 0; i < BAKERS.length; i++) {
 
   buyBaker(i) {
     const cfg = BAKERS[i];
-    const lvl = this.state.bakers[i].level;
+    if (!this.state.bakers[i]) this.state.bakers[i] = { level: 0 };
+
+    const lvl = this.state.bakers[i].level ?? 0;
     const cost = bakerCost(cfg, lvl);
 
     if (this.state.sugar < cost) return;
@@ -405,10 +415,7 @@ for (let i = 0; i < BAKERS.length; i++) {
     this.state.sugar -= cost;
     this.state.bakers[i].level += 1;
 
-    
-    // position des crumbs sur le bouton de la card (approx)
     this.spawnCrumbs(288, 400 + i * 76 + 34, 6);
-
     this.refreshAll();
   }
 
@@ -440,10 +447,20 @@ for (let i = 0; i < BAKERS.length; i++) {
   refreshAll() {
     this.sugarText.setText(`${fmt(this.state.sugar)} Sugar`);
 
-    const dps = computeTotalDps(this.state);
-    const bossTag = computeMonsterForZone(this.state.zone).isBoss ? " • BOSS" : "";
+    this.state.tapDamage = computeTapDamage(this.state) || 1;
+    const dps = computeTotalDps(this.state) || 0;
+
+    const bossTag = computeMonsterForZone(this.state.zone).isBoss
+      ? " • BOSS"
+      : "";
     this.zoneText.setText(`Zone ${this.state.zone}${bossTag}`);
-    this.dpsText.setText(`DPS ${fmt(dps)}  •  Tap ${fmt(this.state.tapDamage)}`);
+
+    const dpsShown =
+      dps < 1 ? dps.toFixed(2) : dps < 10 ? dps.toFixed(1) : fmt(dps);
+
+    this.dpsText.setText(
+      `DPS ${dpsShown}  •  Tap ${fmt(this.state.tapDamage)}`
+    );
 
     const ratio = Phaser.Math.Clamp(
       this.state.monsterHp / this.state.monsterHpMax,
@@ -451,37 +468,63 @@ for (let i = 0; i < BAKERS.length; i++) {
       1
     );
 
-    // HP fill: éviter glitch quand ratio ~0
-    const hpX = 60, hpY = 318, hpW = 240, hpH = 18, r = 9;
+    const hpX = 60,
+      hpY = 318,
+      hpW = 240,
+      hpH = 18,
+      r = 9;
     const w = hpW * ratio;
 
     this.hpBarFill.clear();
     if (w > 0.5) {
       this.hpBarFill.fillStyle(
-        computeMonsterForZone(this.state.zone).isBoss ? 0xe0584e : 0xFFB454,
+        computeMonsterForZone(this.state.zone).isBoss ? 0xe0584e : 0xffb454,
         1
       );
       this.hpBarFill.fillRoundedRect(hpX, hpY, w, hpH, r);
     }
 
-    this.hpText.setText(
-      `${fmt(this.state.monsterHp)} / ${fmt(this.state.monsterHpMax)}`
-    );
+    const hpShown = Math.ceil(this.state.monsterHp);
+    const hpMaxShown = Math.ceil(this.state.monsterHpMax);
+    this.hpText.setText(`${fmt(hpShown)} / ${fmt(hpMaxShown)}`);
 
     // Cards
     this.cards.forEach((c) => {
-      const lvl = this.state.bakers[c.index].level;
+      const bakerState = this.state.bakers[c.index] || { level: 0 };
+      const lvl = bakerState.level ?? 0;
       const cost = bakerCost(c.cfg, lvl);
-      const dpsOne = bakerDps(c.cfg, lvl);
 
-      c.info.setText(`Lvl ${lvl} • DPS ${fmt(dpsOne)} • Cost ${fmt(cost)}`);
+      if (c.cfg.tapBase) {
+        const tapOne = bakerTap(c.cfg, lvl || 1);
+c.info.setText(`Lvl ${lvl} • Tap +${fmt(tapOne)} • Cost ${fmt(cost)}`);
+      } else {
+        const dpsOne = bakerDps(c.cfg, lvl) || 0; // DPS du prochain achat
+        const dpsTotal = bakerTotalDps(c.cfg, lvl) || 0; // DPS total de ce tier
+
+        const dpsOneShown =
+          dpsOne < 1
+            ? dpsOne.toFixed(2)
+            : dpsOne < 10
+            ? dpsOne.toFixed(1)
+            : fmt(dpsOne);
+
+        const dpsTotalShown =
+          dpsTotal < 1
+            ? dpsTotal.toFixed(2)
+            : dpsTotal < 10
+            ? dpsTotal.toFixed(1)
+            : fmt(dpsTotal);
+
+        c.info.setText(
+          `Lvl ${lvl} • DPS ${dpsTotalShown} • Cost ${fmt(cost)}`
+        );
+      }
 
       const affordable = this.state.sugar >= cost;
-      c.buyBtn.fillColor = affordable ? 0x026d5a : 0x9BB3C9;
+      c.buyBtn.fillColor = affordable ? 0x026d5a : 0x9bb3c9;
       c.buyText.setText(affordable ? "BUY" : "LOCK");
     });
 
-    // Si tu ajoutes beaucoup de bakers en runtime, recalculer content height
     this.listContentH = this.cardGap + BAKERS.length * this.cardH;
     this.setScroll(this.scrollY);
   }
@@ -495,49 +538,59 @@ for (let i = 0; i < BAKERS.length; i++) {
 
   // ---------- Offline popup ----------
   showOfflinePopup({ elapsedSec, gained }, UI_DEPTH) {
-    const w = 300, h = 140;
+    const w = 300,
+      h = 140;
     const x = (360 - w) / 2;
     const y = 160;
 
-    const shadow = this.add.rectangle(x + 2, y + 4, w, h, 0x000000, 0.1)
+    const shadow = this.add
+      .rectangle(x + 2, y + 4, w, h, 0x000000, 0.1)
       .setOrigin(0)
       .setDepth(UI_DEPTH + 5);
 
-    const panel = this.add.rectangle(x, y, w, h, 0xffffff, 1)
+    const panel = this.add
+      .rectangle(x, y, w, h, 0xffffff, 1)
       .setOrigin(0)
       .setDepth(UI_DEPTH + 5);
 
     panel.setStrokeStyle(2, 0xe0e7f5, 1);
 
-    const txt = this.add.text(
-      x + 14,
-      y + 14,
-      `Offline gains\n${Math.floor(elapsedSec)}s away\n+${fmt(gained)} Sugar`,
-      {
-        fontFamily: "Baloo 2, system-ui",
-        fontSize: "15px",
-        color: "#1F2A44",
-        lineSpacing: 8,
-        fontStyle: "700",
-      }
-    ).setDepth(UI_DEPTH + 6);
+    const txt = this.add
+      .text(
+        x + 14,
+        y + 14,
+        `Offline gains\n${Math.floor(elapsedSec)}s away\n+${fmt(gained)} Sugar`,
+        {
+          fontFamily: "Baloo 2, system-ui",
+          fontSize: "15px",
+          color: "#1F2A44",
+          lineSpacing: 8,
+          fontStyle: "700",
+        }
+      )
+      .setDepth(UI_DEPTH + 6);
 
-    const btnShadow = this.add.rectangle(x + 16, y + 82, w - 28, 46, 0x000000, 0.12)
+    const btnShadow = this.add
+      .rectangle(x + 16, y + 82, w - 28, 46, 0x000000, 0.12)
       .setOrigin(0)
       .setDepth(UI_DEPTH + 5);
 
-    const btn = this.add.rectangle(x + 14, y + 81, w - 28, 46, 0x026d5a)
+    const btn = this.add
+      .rectangle(x + 14, y + 81, w - 28, 46, 0x026d5a)
       .setOrigin(0)
       .setStrokeStyle(2, 0x026d5a)
       .setInteractive({ useHandCursor: true })
       .setDepth(UI_DEPTH + 6);
 
-    const btntxt = this.add.text(x + w / 2, y + 105, "COLLECT", {
-      fontFamily: "Baloo 2, system-ui",
-      fontSize: "14px",
-      color: "#FFFFFF",
-      fontStyle: "700",
-    }).setOrigin(0.5).setDepth(UI_DEPTH + 7);
+    const btntxt = this.add
+      .text(x + w / 2, y + 105, "COLLECT", {
+        fontFamily: "Baloo 2, system-ui",
+        fontSize: "14px",
+        color: "#FFFFFF",
+        fontStyle: "700",
+      })
+      .setOrigin(0.5)
+      .setDepth(UI_DEPTH + 7);
 
     btn.on("pointerup", () => {
       shadow.destroy();
